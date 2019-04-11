@@ -35,7 +35,9 @@ def add_server(app_name, app_server_ip_addr):
     c = nginx.loadf(nginx_configs_dir+"/"+app_name+'/nginx.conf')
 
     h = c.filter('Http')[0]
+
     c.remove(h)
+
 
     u = h.filter('Upstream')[0]
     h.remove(u)
