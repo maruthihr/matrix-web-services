@@ -5,7 +5,7 @@ from contextlib import closing
 import os
 import etcd
 import shutil
-
+import sys
 
 from mws_persistance import *
 from  NginxConfigBuilder import *
@@ -121,6 +121,86 @@ class mws(Cmd):
                 for worker in runningWorkerIds:
                     print(dockerClient.containers.get(worker).short_id+"\t\t"+worker)
 
+    def help_ls(self):
+        print("List workers for a application: ls <application name>")
+
+    def do_scale(self, inp):
+        cmdArgs = inp.split(' ')
+        if len(cmdArgs) is 2:
+            applicationName = cmdArgs[0]
+            scaleCount = int(cmdArgs[1])
+            print("scale count {}".format(scaleCount))
+            # get the worker ids from etcd
+            runningWorkerIds = getWorkersForApp(applicationName)
+            # if the application is already running, scale up or down
+            if not runningWorkerIds:
+                print("{0} application is not running".format(applicationName))
+            else:
+                # if scaleCount is positive, add workers
+                if scaleCount > 0:
+                    newWorkers = []
+                    print("Adding {} workers for {}".format(scaleCount, applicationName))
+                    # add servers
+                    for worker in range(scaleCount):
+                        appContainer = dockerClient.containers.run(application_image, "python app.py", stderr=True, stdin_open=True, remove=True, detach=True)
+                        ipAddrs = dockerClient.containers.get(appContainer.id).attrs['NetworkSettings']['Networks']['bridge']['IPAddress']
+                        #print("ip addrs {}", ipAddrs)
+                        add_server(applicationName, ipAddrs)
+                        # save container id in etcd
+                        saveAppState(applicationName, appContainer.id)
+                        newWorkers.append(appContainer.short_id)
+                    # retrieve lb from etcd, restart nginx
+                    lbId = getLbForApp(applicationName)
+                    if lbId:
+                        dockerClient.containers.get(lbId).exec_run('nginx -s reload')
+                    
+                    print("Successfully added {} workers for {}".format(scaleCount, applicationName))
+                    for worker in newWorkers:
+                        print(worker)
+
+                # if scaleCount is negative, remove workers
+                elif scaleCount < 0:
+                    count = 0
+                    removedWorkers = []
+                    print("Removing {} workers for {}".format(abs(scaleCount), applicationName))
+                    for worker in runningWorkerIds:
+                        print(worker)
+                        while(count < abs(scaleCount)):
+                            print(count)
+                            count = count + 1
+                            try:
+                                removedWorkers.append(dockerClient.containers.get(worker).short_id)
+                                ipAddrs = dockerClient.containers.get(worker).attrs['NetworkSettings']['Networks']['bridge']['IPAddress']
+                                dockerClient.containers.get(worker).stop(timeout=0)
+                                # delete worker from etcd
+                                deleteWorkerforApp(applicationName, worker)
+                                #remove server from the nginx conf
+                                remove_server(applicationName, ipAddrs)
+                                # retrieve lb from etcd, restart nginx
+                                lbId = getLbForApp(applicationName)
+                                if lbId:
+                                    dockerClient.containers.get(lbId).exec_run('nginx -s reload')
+
+                                print("Successfully removed {} workers for {}".format(abs(scaleCount), applicationName))
+                                for worker in removedWorkers:
+                                    print(worker)
+                    
+                            except:
+                                print("Unexpected error:", sys.exc_info()[0])
+                                continue
+
+                # if scaleCount is 0, no action
+                else:
+                    print("can't scale by 0")
+
+
+    def help_scale(self):
+        print("Add or remove workers for an application: scale <application name> <count> (positive adds, negative removes)")
+
+    def do_reset(self, inp):
+        cmdArgs = inp.split(' ')
+        # delete etcd directory
+        deleteAppState(cmdArgs[0])
 
     def default(self, inp):
         if inp == 'x' or inp == 'q':

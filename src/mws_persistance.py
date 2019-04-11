@@ -51,3 +51,16 @@ def deleteLbState(appName):
         return None
    
 
+def deleteWorkerforApp(appName, workerId):
+    keyFound = False
+    try:
+        numWorkers = client.get('/apps/'+appName)
+    except:
+        return None
+
+    for w in numWorkers.children:
+        if w.value == workerId:
+            client.delete(w.key)
+            keyFound = True
+        
+    return keyFound
