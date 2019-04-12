@@ -64,3 +64,12 @@ def deleteWorkerforApp(appName, workerId):
             keyFound = True
         
     return keyFound
+
+def getCpuUsageFromEtcd(worker):
+    if worker in client:
+        return client.get(worker).value
+    else:
+        return 0
+
+def setCpuUsageFromEtcd(worker, val):
+    client.write(worker, val)
