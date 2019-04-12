@@ -1,7 +1,11 @@
 import time
+import sys
 import docker
-from mws_persistance import *
 
+from src.mws_persistance import *
+from src.NginxConfigBuilder import *
+
+application_image = "webserver_flask"
 
 dockerClient = docker.from_env()
 
@@ -21,10 +25,42 @@ def t_auto_scaling(appName):
         if totalCpuUsage > 25:
             # add a worker
             print("Adding a worker")
+            appContainer = dockerClient.containers.run(application_image, "python app.py", stderr=True, stdin_open=True, remove=True, detach=True)
+            ipAddrs = dockerClient.containers.get(appContainer.id).attrs['NetworkSettings']['Networks']['bridge']['IPAddress']
+            #print("ip addrs {}", ipAddrs)
+            add_server(appName, ipAddrs)
+            # save container id in etcd
+            saveAppState(appName, appContainer.id)
+            lbId = getLbForApp(appName)
+            if lbId:
+                dockerClient.containers.get(lbId).exec_run('nginx -s reload')
+                    
+            
         elif (totalCpuUsage >= 0) and (totalCpuUsage < 15):
             # remove a worker until only one worker is left
             if len(runningWorkers) > 1:
                 print("Removing a worker")
+                # remove a worker from top
+                worker = runningWorkers[0]
+                # try:
+                ipAddrs = dockerClient.containers.get(worker).attrs['NetworkSettings']['Networks']['bridge']['IPAddress']
+                dockerClient.containers.get(worker).stop(timeout=0)
+                # delete worker from etcd
+                deleteWorkerforApp(appName, worker)
+                #remove server from the nginx conf
+                remove_server(appName, ipAddrs)
+                # retrieve lb from etcd, restart nginx
+                lbId = getLbForApp(appName)
+                if lbId:
+                    dockerClient.containers.get(lbId).exec_run('nginx -s reload')
+
+                    # print("Successfully removed {} workers for {}".format(abs(scaleCount), applicationName))
+                    # for worker in removedWorkers:
+                print("Removed worker " + worker)
+        
+                # except:
+                #     print("Unexpected error:", sys.exc_info()[0])
+                #     continue
             else:
                 print("Running one worker")
         elif totalCpuUsage == 0:

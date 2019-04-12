@@ -15,9 +15,15 @@ def animate(i):
     for line in lines:
         if len(line) > 1:
             x, y = line.split(',')
+            textstr = 'CPU usage = %.4f\nNum of workers = %d'%(float(x),int(y))
             xs.append(float(x))
             ys.append(float(y))
     ax1.clear()
+    # these are matplotlib.patch.Patch properties
+    props = dict(boxstyle='round', facecolor='wheat', alpha=0.5)
+    # place a text box in upper left in axes coords
+    ax1.text(0.05, 0.95, textstr, transform=ax1.transAxes, fontsize=14,
+            verticalalignment='top', bbox=props)
     ax1.plot(xs, ys)
 
 

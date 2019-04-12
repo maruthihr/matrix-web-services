@@ -1,6 +1,6 @@
 import nginx
 
-from mws import nginx_configs_dir
+from src.initializations import nginx_configs_dir
 
 
 def create_nginx_config(nginx_port, app_name):

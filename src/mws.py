@@ -9,15 +9,16 @@ import sys
 import threading
 import time
 
-from mws_persistance import *
-from  NginxConfigBuilder import *
-from auto_scaling import *
+from src.mws_persistance import *
+from src.NginxConfigBuilder import *
+from src.auto_scaling import *
+from src.initializations import *
 
 dockerClient = docker.from_env() 
 etcdClient = etcd.Client(port=2379)
 application_image = "webserver_flask"
 lb_image = "mws-nginx"
-nginx_configs_dir = 'nginx-configs'
+
 
 
 
@@ -201,7 +202,7 @@ class mws(Cmd):
         print("Add or remove workers for an application: scale <application name> <count> (positive adds, negative removes)")
 
     # start auto scaling for a specificed app
-    def do_auto_scale(self, inp):
+    def do_autoscale(self, inp):
         cmdArgs = inp.split(' ')
         if len(cmdArgs) is 1:
             applicationName = cmdArgs[0]
@@ -216,9 +217,9 @@ class mws(Cmd):
                 t.start()
 
             
-    def help_auto_scale(self):
+    def help_autoscale(self):
+        print("Start auto-scaling app")
 
-        print("Start auto-scaling app {}".format(applicationName))
     def do_reset(self, inp):
         cmdArgs = inp.split(' ')
         # delete etcd directory
@@ -243,6 +244,3 @@ class mws(Cmd):
 
 
 
-
-if __name__ == '__main__':
-    mws().cmdloop()
