@@ -1,33 +1,44 @@
 import time
 import sys
 import docker
+import logging
 
 from src.mws_persistance import *
 from src.NginxConfigBuilder import *
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(message)s')
+hdlr = logging.FileHandler('auto_scale.log')
+logger.addHandler(hdlr)
+logger.propagate = False
+
 application_image = "webserver_flask"
 
 dockerClient = docker.from_env()
+prevTotalCpuUsage = 0.0
+
 
 
 def t_auto_scaling(appName):
-    print("Starting the auto scaler for {}".format(appName))
+    global prevTotalCpuUsage
+    logger.info("Starting the auto scaler for {}".format(appName))
     while True:
-        #print("gettig stats")
+        #logger.info("gettig stats")
         runningWorkers = getWorkersForApp(appName)
         totalCpuUsageBeforeConversion = getTotalCpuUsage(appName)
+        f = open('data.txt', 'a')
+        f.write(str(roundUp(int(totalCpuUsageBeforeConversion))) + ','+ str(len(runningWorkers))+'\n')
+        f.close()
         # get total cpu usage every 100ms
         totalCpuUsage = int(totalCpuUsageBeforeConversion)
-        f = open('data.txt', 'a')
-        f.write(str(totalCpuUsageBeforeConversion) + ','+ str(len(runningWorkers))+'\n')
-        f.close()
-        print("Total CPU usage {} %".format(totalCpuUsage))
-        if totalCpuUsage > 25:
+        logger.info("Total CPU usage {} %".format(totalCpuUsage))
+        # scale up if the totalCpuUsage is more than 25% and the delta cpu usage is 5%
+        if (totalCpuUsage > 0 and ((totalCpuUsage - prevTotalCpuUsage) >= 5)):
             # add a worker
-            print("Adding a worker")
+            logger.info("Adding a worker")
             appContainer = dockerClient.containers.run(application_image, "python app.py", stderr=True, stdin_open=True, remove=True, detach=True)
             ipAddrs = dockerClient.containers.get(appContainer.id).attrs['NetworkSettings']['Networks']['bridge']['IPAddress']
-            #print("ip addrs {}", ipAddrs)
+            #logger.info("ip addrs {}", ipAddrs)
             add_server(appName, ipAddrs)
             # save container id in etcd
             saveAppState(appName, appContainer.id)
@@ -36,10 +47,10 @@ def t_auto_scaling(appName):
                 dockerClient.containers.get(lbId).exec_run('nginx -s reload')
                     
             
-        elif (totalCpuUsage >= 0) and (totalCpuUsage < 15):
+        elif (totalCpuUsage >= 0) and ((prevTotalCpuUsage - totalCpuUsage) >= 5 ):
             # remove a worker until only one worker is left
             if len(runningWorkers) > 1:
-                print("Removing a worker")
+                logger.info("Removing a worker")
                 # remove a worker from top
                 worker = runningWorkers[0]
                 # try:
@@ -54,15 +65,15 @@ def t_auto_scaling(appName):
                 if lbId:
                     dockerClient.containers.get(lbId).exec_run('nginx -s reload')
 
-                    # print("Successfully removed {} workers for {}".format(abs(scaleCount), applicationName))
+                    # logger.info("Successfully removed {} workers for {}".format(abs(scaleCount), applicationName))
                     # for worker in removedWorkers:
-                print("Removed worker " + worker)
+                logger.info("Removed worker " + worker)
         
                 # except:
-                #     print("Unexpected error:", sys.exc_info()[0])
+                #     logger.info("Unexpected error:", sys.exc_info()[0])
                 #     continue
             else:
-                print("Running one worker")
+                logger.info("Running one worker")
         elif totalCpuUsage == 0:
             # do nothing
             pass
@@ -70,6 +81,7 @@ def t_auto_scaling(appName):
         else: 
             # Nothing to do
             pass
+        prevTotalCpuUsage = totalCpuUsage
         time.sleep(1)
 
 def getTotalCpuUsage(appName):
@@ -100,10 +112,33 @@ def calculate_cpu_percent2(d, previous_cpu, previous_system):
     online_cpus = d["cpu_stats"].get("online_cpus", len(d["cpu_stats"]["cpu_usage"]["percpu_usage"]))
     if system_delta > 0.0:
         cpu_percent = (cpu_delta / system_delta) * online_cpus * 100.0
-    #print(cpu_percent, cpu_system, cpu_total)
+    #logger.info(cpu_percent, cpu_system, cpu_total)
     return cpu_percent, cpu_system, cpu_total
 
+# round up the number to the nearest multiple of 5
+def roundUp(numToRound):
+    multiple = 5
+    remainder = numToRound % multiple
+    if remainder == 0:
+        return numToRound
+    return numToRound + multiple - remainder
 
+
+# int roundUp(int numToRound, int multiple)  
+# {  
+#  if(multiple == 0)  
+#  {  
+#   return numToRound;  
+#  }  
+
+#  int remainder = numToRound % multiple; 
+#  if (remainder == 0)
+#   {
+#     return numToRound; 
+#   }
+
+#  return numToRound + multiple - remainder; 
+# }
 
 # for testing purpose
 if __name__ == "__main__":
