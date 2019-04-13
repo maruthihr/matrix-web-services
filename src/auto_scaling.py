@@ -27,7 +27,7 @@ def t_auto_scaling(appName):
         runningWorkers = getWorkersForApp(appName)
         totalCpuUsageBeforeConversion = getTotalCpuUsage(appName)
         f = open('data.txt', 'a')
-        f.write(str(roundUp(int(totalCpuUsageBeforeConversion))) + ','+ str(len(runningWorkers))+'\n')
+        f.write(str((int(totalCpuUsageBeforeConversion))) + ','+ str(len(runningWorkers))+'\n')
         f.close()
         # get total cpu usage every 100ms
         totalCpuUsage = int(totalCpuUsageBeforeConversion)

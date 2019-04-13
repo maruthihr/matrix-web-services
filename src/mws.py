@@ -170,7 +170,7 @@ class mws(Cmd):
                     for worker in runningWorkerIds:
                         print(worker)
                         while(count < abs(scaleCount)):
-                            print(count)
+                            #print(count)
                             count = count + 1
                             try:
                                 removedWorkers.append(dockerClient.containers.get(worker).short_id)
@@ -186,8 +186,8 @@ class mws(Cmd):
                                     dockerClient.containers.get(lbId).exec_run('nginx -s reload')
 
                                 print("Successfully removed {} workers for {}".format(abs(scaleCount), applicationName))
-                                for worker in removedWorkers:
-                                    print(worker)
+                                # for worker in removedWorkers:
+                                #     print(worker)
                     
                             except:
                                 print("Unexpected error:", sys.exc_info()[0])
