@@ -88,6 +88,15 @@ def getAllWorkers():
         # print(workersDict.values())
     return workersDict
 
+def deleteAllState():
+    try:
+        client.delete('/apps/', recursive=True)
+        return True
+    except:
+        return None
+
 
 if __name__ == "__main__":
+    getAllWorkers()
+    deleteAllState()
     getAllWorkers()

@@ -56,7 +56,7 @@ def t_worker_management():
                             except docker.errors.NotFound:
                                 pass
         
-        time.sleep(1)
+        time.sleep(5)
 
         
 

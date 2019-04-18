@@ -219,9 +219,12 @@ class mws(Cmd):
         print("Start auto-scaling app")
 
     def do_reset(self, inp):
-        cmdArgs = inp.split(' ')
+        allWorkers = getAllWorkers()
+        if allWorkers is not None:
+            for key, value in allWorkers.items():
+                dockerClient.containers.get(value).stop(timeout=0)
         # delete etcd directory
-        deleteAppState(cmdArgs[0])
+        deleteAllState()
 
     def default(self, inp):
         if inp == 'x' or inp == 'q':
