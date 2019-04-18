@@ -61,7 +61,7 @@ class mws(Cmd):
                                                 name=applicationName+"-lb", remove=True, detach=True,
                                                 volumes={os.getcwd()+'/'+nginx_configs_dir+"/"+applicationName: {'bind': '/etc/nginx', 'mode': 'ro'}})
 
-                saveLbState(applicationName, lbContainer.id)
+                saveLbState(applicationName, lbContainer.id, port)
                 lbContainer.exec_run('nginx -s reload')
 
                 print("{0} started with {1} worker/s at 127.0.0.1:{2}".format(cmdArgs[0], cmdArgs[1], port))
@@ -121,7 +121,10 @@ class mws(Cmd):
                 print("{} workers running for {}".format(len(runningWorkerIds), applicationName))
                 print("short_id\t\tlong_id")
                 for worker in runningWorkerIds:
-                    print(dockerClient.containers.get(worker).short_id+"\t\t"+worker)
+                    try:
+                        print(dockerClient.containers.get(worker).short_id+"\t\t"+worker)
+                    except docker.errors.NotFound:
+                        pass
 
     def help_ls(self):
         print("List workers for a application: ls <application name>")
@@ -222,8 +225,14 @@ class mws(Cmd):
         allWorkers = getAllWorkers()
         if allWorkers is not None:
             for key, value in allWorkers.items():
-                dockerClient.containers.get(value).stop(timeout=0)
+                try:
+                    dockerClient.containers.get(value).stop(timeout=0)
+                except:
+                    pass
         # delete etcd directory
+        deleteAllState()
+
+    def do_resetetcd(self, inp):
         deleteAllState()
 
     def default(self, inp):
