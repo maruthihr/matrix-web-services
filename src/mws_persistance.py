@@ -73,3 +73,21 @@ def getCpuUsageFromEtcd(worker):
 
 def setCpuUsageFromEtcd(worker, val):
     client.write(worker, val)
+
+
+def getAllWorkers():
+    workersDict = {}
+    try:
+        workers = client.read('/apps/', recursive=True)
+    except:
+        return None
+
+    for w in workers.children:
+        workersDict.update({w.key : w.value})
+        # print(workersDict.keys())
+        # print(workersDict.values())
+    return workersDict
+
+
+if __name__ == "__main__":
+    getAllWorkers()

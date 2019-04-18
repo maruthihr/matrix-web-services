@@ -5,7 +5,7 @@ We named our project as Matrix Web Services (MWS).
 # Getting Started
 The MWS can be started by running the __main__.py file on the project root directory. When started, the MWS gives a command line interface where users can enter different commands supported by the MWS. The MWS Command Line Interface (CLI) looks like below:
 
-![Image description]()
+![MWS CLI](/images/mws_cli.png)
 
 # Commands:
 # 1. start 

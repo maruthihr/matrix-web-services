@@ -16,8 +16,6 @@ from src.initializations import *
 
 dockerClient = docker.from_env() 
 etcdClient = etcd.Client(port=2379)
-application_image = "webserver_flask"
-lb_image = "mws-nginx"
 
 
 
