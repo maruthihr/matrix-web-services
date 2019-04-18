@@ -4,3 +4,9 @@ DS_Store
 test/load_test.sh
 auto_scale.log
 worker_management.log
+auto_scale.log
+auto_scale_algorithm
+data.txt
+auto_scale.log
+worker_management.log
+data.txt

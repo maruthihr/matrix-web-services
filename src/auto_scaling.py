@@ -21,19 +21,29 @@ prevTotalCpuUsage = 0.0
 
 def t_auto_scaling(appName):
     global prevTotalCpuUsage
+    prevAdd = 0
+    nextAdd = 5
+    prevRemove = 0
+    nextRemove = 0
+    runningWorkers = getWorkersForApp(appName)
+    totalCpuUsageBeforeConversion = getTotalCpuUsage(appName)
+    totalCpuUsage = int(totalCpuUsageBeforeConversion)
+    f = open('data.txt', 'a')
+    f.write(str((int(totalCpuUsage))) + ','+ str(len(runningWorkers))+'\n')
+    f.close()
     logger.info("Starting the auto scaler for {}".format(appName))
     while True:
         #logger.info("gettig stats")
         runningWorkers = getWorkersForApp(appName)
         totalCpuUsageBeforeConversion = getTotalCpuUsage(appName)
-        f = open('data.txt', 'a')
-        f.write(str((int(totalCpuUsageBeforeConversion))) + ','+ str(len(runningWorkers))+'\n')
-        f.close()
-        # get total cpu usage every 100ms
         totalCpuUsage = int(totalCpuUsageBeforeConversion)
-        logger.info("Total CPU usage {} %".format(totalCpuUsage))
+        logger.info("1. Total CPU usage {}, prevTotalCpuUsage {}, prevAdd {}, nextAdd {}, preRemove {}, nextRemove {} ".format(totalCpuUsage, prevTotalCpuUsage, prevAdd, nextAdd, prevRemove, nextRemove))
         # scale up if the totalCpuUsage is more than 25% and the delta cpu usage is 5%
-        if (totalCpuUsage > 0 and ((totalCpuUsage - prevTotalCpuUsage) >= 5)):
+        if (totalCpuUsage > 0 and ((totalCpuUsage - prevTotalCpuUsage) >= 1) and totalCpuUsage >= nextAdd): 
+            f = open('data.txt', 'a')
+            f.write(str((int(nextAdd))) + ','+ str(len(runningWorkers))+'\n')
+            f.close()
+            # get total cpu usage every 100ms
             # add a worker
             logger.info("Adding a worker")
             appContainer = dockerClient.containers.run(application_image, "python app.py", stderr=True, stdin_open=True, remove=True, detach=True)
@@ -45,11 +55,22 @@ def t_auto_scaling(appName):
             lbId = getLbForApp(appName)
             if lbId:
                 dockerClient.containers.get(lbId).exec_run('nginx -s reload')
+            # update variables
+            prevAdd = nextAdd
+            nextAdd = nextAdd + 5
+            nextRemove = prevAdd
+            prevRemove = nextRemove + 5
                     
             
-        elif (totalCpuUsage >= 0) and ((prevTotalCpuUsage - totalCpuUsage) >= 5 ):
+        elif (totalCpuUsage >= 0) and \
+                (((prevTotalCpuUsage - totalCpuUsage) >= 1) or (prevTotalCpuUsage == 0 and totalCpuUsage == 0)) and \
+                totalCpuUsage <= nextRemove:
             # remove a worker until only one worker is left
             if len(runningWorkers) > 1:
+                f = open('data.txt', 'a')
+                f.write(str((int(nextRemove))) + ','+ str(len(runningWorkers))+'\n')
+                f.close()
+                
                 logger.info("Removing a worker")
                 # remove a worker from top
                 worker = runningWorkers[0]
@@ -72,9 +93,16 @@ def t_auto_scaling(appName):
                 # except:
                 #     logger.info("Unexpected error:", sys.exc_info()[0])
                 #     continue
+                #update variables
+                prevRemove = nextRemove
+                if(nextRemove > 0):
+                    nextRemove = nextRemove - 5
+                nextAdd = prevRemove
+                prevAdd = nextAdd - 5
             else:
                 logger.info("Running one worker")
         elif totalCpuUsage == 0:
+
             # do nothing
             pass
         # if the cpu usage is between 15 and 25
@@ -82,6 +110,7 @@ def t_auto_scaling(appName):
             # Nothing to do
             pass
         prevTotalCpuUsage = totalCpuUsage
+        logger.info("2. Total CPU usage {}, prevTotalCpuUsage {}, prevAdd {}, nextAdd {}, preRemove {}, nextRemove {} ".format(totalCpuUsage, prevTotalCpuUsage, prevAdd, nextAdd, prevRemove, nextRemove))
         time.sleep(1)
 
 def getTotalCpuUsage(appName):
